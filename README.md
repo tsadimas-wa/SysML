@@ -1,12 +1,85 @@
 # SysML v2 Local Environment Setup Guide
 
-This guide outlines how to set up a completely local SysML v2 development environment using JupyterLab for modeling and a local PostgreSQL-backed REST API for querying the parsed abstract syntax tree (AST) elements as JSON.
+This guide shows how to set up a fully local SysML v2 environment:
+* **JupyterLab** with the SysML v2 kernel (from `SysML-v2-Release`) for writing and visualising models.
+* A local **REST API** (`SysML-v2-API-Services`) backed by **PostgreSQL**, which stores the published models. You can query every model element as JSON.
 
-## Prerequisites
-* **Miniconda / Python 3.x** (for JupyterLab)
-* **Docker** (for the PostgreSQL database)
-* **JDK 11 & sbt** (Scala Build Tool, for the API server)
-* **Git**
+Nothing is sent to external servers.
+
+### Overview
+
+```text
+ JupyterLab + SysML kernel  --%publish-->  API server (sbt, port 9000)  -->  PostgreSQL (Docker, port 5432)
+        (Java 21)                                (Java 11)
+```
+
+You will need **three things running** at the same time:
+
+| # | What | Where | Java |
+|---|---|---|---|
+| 1 | PostgreSQL container | Docker (runs in the background) | – |
+| 2 | API server (`sbt run`) | Terminal A | **JDK 11** |
+| 3 | JupyterLab (`jupyter lab`) | Terminal B | **Java 21+** |
+
+> ⚠️ The two components need **different Java versions**. The API Services require JDK 11 and the Jupyter kernel requires Java 21 or newer. Install both, and set `JAVA_HOME` to JDK 11 **only in the terminal that runs the API** (Part 1, step 5).
+
+---
+
+## Part 0: Install the Prerequisites
+
+The commands below are for **Ubuntu/Debian**. Commands for **Arch Linux** are given where they differ. On Windows/macOS, use the linked installers.
+
+### 1. Git
+```bash
+sudo apt install git            # Arch: sudo pacman -S git
+```
+
+### 2. Java (JDK 11 and Java 21)
+```bash
+sudo apt install openjdk-11-jdk openjdk-21-jdk     # Arch: sudo pacman -S jdk11-openjdk jdk21-openjdk
+ls /usr/lib/jvm/                                   # note the installation folder names
+```
+Make **Java 21 the default** `java`. JupyterLab starts the kernel with whatever `java` is on your `PATH`.
+```bash
+sudo update-alternatives --config java             # Arch: sudo archlinux-java set java-21-openjdk
+java -version                                      # should print 21.x
+```
+Windows/macOS: install [Temurin 11 and 21](https://adoptium.net/temurin/releases/).
+
+### 3. sbt (Scala Build Tool)
+The easiest cross-platform option is [SDKMAN](https://sdkman.io/):
+```bash
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdk install sbt
+sbt --version
+```
+Arch: `sudo pacman -S sbt`. Other options: see [scala-sbt.org](https://www.scala-sbt.org/download/).
+
+### 4. Docker
+```bash
+sudo apt install docker.io                # Arch: sudo pacman -S docker
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER             # log out and back in afterwards
+docker run hello-world                    # test
+```
+Windows/macOS: install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+### 5. Miniconda (Python 3)
+```bash
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh    # accept the licence, keep the default location, answer "yes" to initialise
+source ~/.bashrc                          # or open a new terminal (zsh users: ~/.zshrc)
+conda --version
+```
+Windows/macOS: download the installer from [docs.conda.io](https://docs.conda.io/en/latest/miniconda.html). On Windows, tick **"Add Miniconda to my PATH"**.
+
+Create a dedicated environment for this course and activate it:
+```bash
+conda create -n sysml python=3.11 -y
+conda activate sysml
+```
+> Activate this environment (`conda activate sysml`) in every new terminal where you use Jupyter.
 
 ---
 
@@ -19,7 +92,7 @@ cd SysML-v2-API-Services
 ```
 
 ### 2. Start the PostgreSQL Database
-The API requires a PostgreSQL database to store the parsed models. Spin it up using Docker:
+The API stores published models in a PostgreSQL database. Start one with Docker:
 ```bash
 docker run -d \
   --name sysml2-postgres \
@@ -29,13 +102,18 @@ docker run -d \
   -e POSTGRES_DB=sysml2 \
   postgres:13
 ```
+You only need to create the container **once**. After a reboot, start it again with:
+```bash
+docker start sysml2-postgres
+docker ps                        # sysml2-postgres should be listed as "Up"
+```
 
-### 3. Fix the Hibernate Persistence Configuration
-By default, the API repository ships with an incorrect database password in its Hibernate configuration, which will cause a `ServiceException: Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]` error.
+### 3. Update the Hibernate Persistence Configuration
+The repository's `persistence.xml` expects the password `mysecretpassword` and the host `localhost`. The container above uses the password `postgres`, so update the file to match. If you skip this step, the server fails with `ServiceException: Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]`.
 
-1. Open `conf/META-INF/persistence.xml`
-2. Locate the `<properties>` block at the bottom.
-3. Update the `jdbc.url` to use `127.0.0.1` (to avoid IPv6 localhost mismatch) and change the password from `mysecretpassword` to `postgres`.
+1. Open `conf/META-INF/persistence.xml`.
+2. Find the `<properties>` block at the bottom.
+3. In `jdbc.url`, change `localhost` to `127.0.0.1` (this avoids an IPv6 localhost mismatch). Change the password from `mysecretpassword` to `postgres`.
 
 ```xml
 <properties>
@@ -47,42 +125,79 @@ By default, the API repository ships with an incorrect database password in its 
 </properties>
 ```
 
-### 4. Start the API Server
-Ensure your terminal is using Java 11, then launch the server using `sbt`:
+### 4. (Recommended) Keep Your Data Between Restarts
+By default, the same block contains:
+```xml
+<property name="hibernate.hbm2ddl.auto" value="create-drop"/>
+```
+With `create-drop`, **the database is emptied every time the API server stops**, so all published projects are lost. To keep them, change the value to `update`:
+```xml
+<property name="hibernate.hbm2ddl.auto" value="update"/>
+```
+
+### 5. Start the API Server (Terminal A)
+In this terminal, switch to Java 11 and start the server with `sbt`:
 ```bash
-export JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+# Ubuntu/Debian: /usr/lib/jvm/java-11-openjdk-amd64    Arch: /usr/lib/jvm/java-11-openjdk
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 export PATH=$JAVA_HOME/bin:$PATH
+java -version                    # should print 11.x
 
 sbt clean run
 ```
-*Wait until the console displays `Listening for HTTP on /0:0:0:0:0:0:0:0:9000`.*
+*The first run downloads dependencies and can take several minutes. Wait until the console shows `Listening for HTTP on /0:0:0:0:0:0:0:0:9000`.*
+
+The server compiles on the **first HTTP request**. Open http://127.0.0.1:9000/projects in your browser and wait until it returns `[]` (an empty list). The Swagger API documentation is at http://127.0.0.1:9000/docs/.
+
+**Keep this terminal open.** To stop the server, press `Enter` (or `Ctrl+C`).
 
 ---
 
-## Part 2: Jupyter Frontend Setup (`SysML-v2-Release`)
+## Part 2: Jupyter Frontend Setup (`SysML-v2-Release`) — Terminal B
 
-### 1. Clone the Repository & Install Kernel
+Open a **new terminal** (Terminal B). Do **not** set `JAVA_HOME` to Java 11 here. `java -version` must print 21 or newer.
+
+### 1. Clone the Repository & Install the Kernel
 ```bash
+conda activate sysml
 git clone https://github.com/Systems-Modeling/SysML-v2-Release.git
-cd SysML-v2-Release
+cd SysML-v2-Release/install/jupyter
+chmod +x ./install.sh
+./install.sh
 ```
-*(Follow the standard instructions in this repository to install the Jupyter Kernel into your Miniconda environment, typically via `pip install .` inside the `jupyter` folder).*
+The script (Windows: `install.bat`) installs the following into the active conda environment from `conda-forge`:
+* `jupyter-sysml-kernel`
+* JupyterLab 4
+* Graphviz, which `%viz` needs
+* Node.js
+
+It also installs the JupyterLab SysML extension.
+
+Check that the kernel was registered:
+```bash
+jupyter kernelspec list          # should list "sysml"
+```
 
 ### 2. Fix the Kernel Configuration (Bypass Public Server)
-By default, the Jupyter kernel tries to publish models to the public Intercax test server. You must hardcode it to use your local API.
+By default, `%publish` sends models to a public test server. Point it at your local API instead by setting the `ISYSML_API_BASE_PATH` environment variable in the kernel's `kernel.json`.
 
 1. Find the kernel location:
    ```bash
    jupyter kernelspec list
    ```
-2. Open the `kernel.json` file located in the `sysml` directory shown by the command above (e.g., `nano /path/to/share/jupyter/kernels/sysml/kernel.json`).
-3. Add the `"env"` block pointing to `127.0.0.1:9000`:
+   Example output: `sysml   /home/<user>/miniconda3/envs/sysml/share/jupyter/kernels/sysml`
+2. Open `kernel.json` in that folder:
+   ```bash
+   nano ~/miniconda3/envs/sysml/share/jupyter/kernels/sysml/kernel.json
+   ```
+3. **Keep the existing `argv` entries unchanged.** They contain the path to the kernel's `.jar` file. Add only the `"env"` block, and remember the comma after the previous entry:
 
 ```json
 {
   "argv": [
     "java",
     "-jar",
+    "<keep the existing path to jupyter-sysml-kernel-...jar>",
     "{connection_file}"
   ],
   "display_name": "SysML",
@@ -94,9 +209,26 @@ By default, the Jupyter kernel tries to publish models to the public Intercax te
 }
 ```
 
+If `kernel.json` already has an `"env"` block, add the `ISYSML_API_BASE_PATH` line inside it instead of creating a second block.
+
+> `install.sh` removes and recreates the kernel. If you run it again, repeat this step.
+
 ### 3. Start JupyterLab
 ```bash
+conda activate sysml
+mkdir -p ~/sysml-notebooks && cd ~/sysml-notebooks     # folder where your notebooks will be saved
 jupyter lab
+```
+JupyterLab opens in your browser at http://localhost:8888. If it does not, copy the URL with the `?token=...` part from the terminal output. **Keep this terminal open.** Stop JupyterLab with `Ctrl+C` and confirm with `y`.
+
+If you edit `kernel.json` while JupyterLab is running, restart the kernel (**Kernel → Restart Kernel**) so the change takes effect.
+
+### Daily Start-Up Checklist
+```bash
+docker start sysml2-postgres                                  # 1. database
+# Terminal A (Java 11):  export JAVA_HOME=<JDK 11 path> PATH=$JAVA_HOME/bin:$PATH
+#                        cd SysML-v2-API-Services && sbt run  # 2. API, then open http://127.0.0.1:9000/projects
+# Terminal B (Java 21):  conda activate sysml && jupyter lab  # 3. JupyterLab
 ```
 
 ---
@@ -305,13 +437,22 @@ Open these URLs in your browser (Firefox formats JSON nicely) or query them with
 | Root elements only | `http://127.0.0.1:9000/projects/<PROJECT_ID>/commits/<COMMIT_ID>/roots` |
 | A single element | `http://127.0.0.1:9000/projects/<PROJECT_ID>/commits/<COMMIT_ID>/elements/<ELEMENT_ID>` |
 
-Example with `curl` and `jq`:
+> **Pagination:** list endpoints return at most **100 items per page**. Add `?page[size]=1000` to get more at once, or follow the `Link: ...; rel="next"` response header to the next page. With `curl`, quote the URL or escape the brackets (`curl -g`).
+
+Example with `curl` and `jq` (install `jq` with `sudo apt install jq` / `sudo pacman -S jq`):
 ```bash
 curl -s http://127.0.0.1:9000/projects | jq '.[] | {name, "@id"}'
+curl -sg "http://127.0.0.1:9000/projects/<PROJECT_ID>/commits/<COMMIT_ID>/elements?page[size]=1000" | jq 'length'
 ```
 
 ### 2. Query the Model with Python
-The following script lists every named element in the published model by type:
+Install `requests` in the course environment first:
+```bash
+conda activate sysml
+pip install requests
+```
+
+The following script lists every named element in the published model by type. It follows the pagination links so that no elements are missed. Save it as `list_elements.py`, replace the two IDs, and run `python list_elements.py` in a terminal where `sysml` is activated:
 
 ```python
 import requests
@@ -320,9 +461,15 @@ BASE = "http://127.0.0.1:9000"
 PROJECT_ID = "<PROJECT_ID>"
 COMMIT_ID = "<COMMIT_ID>"
 
-elements = requests.get(
-    f"{BASE}/projects/{PROJECT_ID}/commits/{COMMIT_ID}/elements"
-).json()
+elements = []
+url = f"{BASE}/projects/{PROJECT_ID}/commits/{COMMIT_ID}/elements"
+while url:
+    r = requests.get(url)
+    r.raise_for_status()
+    elements.extend(r.json())
+    url = r.links.get("next", {}).get("url")   # next page, if any
+
+print(f"{len(elements)} elements")
 
 for e in elements:
     name = e.get("declaredName")
