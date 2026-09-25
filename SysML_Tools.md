@@ -12,7 +12,7 @@
 | **Model repository / REST API** | No | Only through Teamwork Cloud (separate commercial server) | Yes, server database; partial support for the OMG SysML v2 REST API | No model server; models are `.sysml` files (e.g. in Git). Automator provides a Python API instead | Yes, local PostgreSQL + OMG SysML v2 REST API (pilot implementation) |
 | **Model size limit** | None | **500 major elements** | None | None stated | None |
 | **Main limitation** | File viewer/editor only: no model repository, no API, no publishing | Element cap; intended for learning and teaching, not production work | Text editing is limited; you must deploy a server (e.g. Docker) or use a hosted instance | Diagrams and Python API need a licence (the Academic Licence must be requested); proprietary | Manual setup (Docker, JDK 11 + Java 21, sbt, Miniconda/Jupyter); see [README.md](README.md) |
-| **Recommended for this course** | Reading and editing example files | Small exercises with diagrams | Graphical exploration | Writing models in VS Code; scripted analysis with Python (Academic Licence) | ✅ **Most reliable free option** |
+| **Recommended for this course** | Reading and editing example files | Small exercises with diagrams | Graphical exploration | Writing models in VS Code; scripted analysis with Python (Academic Licence) | ✅ **Reference implementation: most standard-compliant free option** |
 
 ¹ SysML v2.0 was formally adopted by the OMG in July 2025. There is no official conformance certification yet; the Systems Modeling Community (SMC) is still developing a conformance test suite. Commercial compliance entries are vendor claims.
 
@@ -21,7 +21,7 @@
 - **CATIA Community Edition:** full textual and graphical modeling, but capped at 500 major elements. REST API access needs Teamwork Cloud ([Dassault Systèmes](https://discover.3ds.com/free-catia-sysmlv2-community-edition), [documentation](https://docs.nomagic.com/SYSML2P/2026x/catia-magic-cameo-sysml-v2-community-edition-286557495.html)).
 - **Syside:** text-first modeling in VS Code. The free Editor has no diagrams; the Modeler (diagrams) and Automator (Python API) are free only with an Academic Licence ([pricing](https://sensmetry.com/syside-pricing/), [docs](https://docs.sensmetry.com/)).
 - **Syson:** graphical web tool. It has a partial REST API but limited textual editing and export.
-- **SysML v2 Release + API Services:** the most reliable free setup, with no size limits, full textual notation and programmatic access to the model as JSON. Setup is described in [README.md](README.md).
+- **SysML v2 Release + API Services:** the most standard-compliant free setup, because it is the reference implementation. It has no size limits, supports the full textual notation and gives programmatic access to the model as JSON. It is a pilot rather than a polished product: setup takes effort and its diagrams are static. Setup is described in [README.md](README.md).
 
 ## SysML v2.0 Language Support for VS Code
 

@@ -89,7 +89,9 @@ conda activate sysml
 ```bash
 git clone https://github.com/Systems-Modeling/SysML-v2-API-Services.git
 cd SysML-v2-API-Services
+git checkout 2026-04
 ```
+> **Use matching versions.** API Services and the Jupyter kernel (Part 2) must be on the **same release**. If the kernel's metamodel is newer than the API server's, `%publish` can fail or lose elements. This guide uses **`2026-04`**, the latest API Services release. Check both repositories' release pages before changing it.
 
 ### 2. Start the PostgreSQL Database
 The API stores published models in a PostgreSQL database. Start one with Docker:
@@ -161,7 +163,9 @@ Open a **new terminal** (Terminal B). Do **not** set `JAVA_HOME` to Java 11 here
 ```bash
 conda activate sysml
 git clone https://github.com/Systems-Modeling/SysML-v2-Release.git
-cd SysML-v2-Release/install/jupyter
+cd SysML-v2-Release
+git checkout 2026-04                # same release as API Services (Part 1)
+cd install/jupyter
 chmod +x ./install.sh
 ./install.sh
 ```
@@ -171,7 +175,7 @@ The script (Windows: `install.bat`) installs the following into the active conda
 * Graphviz, which `%viz` needs
 * Node.js
 
-It also installs the JupyterLab SysML extension.
+It also installs the JupyterLab SysML extension. Each release pins its own kernel version: the `2026-04` release installs kernel `0.59.0`. Check the version with `conda list jupyter-sysml-kernel`.
 
 Check that the kernel was registered:
 ```bash
