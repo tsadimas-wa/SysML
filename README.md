@@ -91,7 +91,7 @@ git clone https://github.com/Systems-Modeling/SysML-v2-API-Services.git
 cd SysML-v2-API-Services
 git checkout 2026-04
 ```
-> **Use matching versions.** API Services and the Jupyter kernel (Part 2) must be on the **same release**. If the kernel's metamodel is newer than the API server's, `%publish` can fail or lose elements. This guide uses **`2026-04`**, the latest API Services release. Check both repositories' release pages before changing it.
+> **Use matching versions where possible.** API Services and the Jupyter kernel should be on the **same release**. If the kernel's metamodel is newer than the API server's, `%publish` can fail or lose elements. The latest tagged API Services release is **`2026-04`**, while the latest `SysML-v2-Release` tag is **`2026-08`**. This guide uses those latest tags; if publishing fails, use `git checkout 2026-04` in both repositories.
 
 ### 2. Start the PostgreSQL Database
 The API stores published models in a PostgreSQL database. Start one with Docker:
@@ -151,6 +151,13 @@ sbt clean run
 
 The server compiles on the **first HTTP request**. Open http://127.0.0.1:9000/projects in your browser and wait until it returns `[]` (an empty list). The Swagger API documentation is at http://127.0.0.1:9000/docs/.
 
+The API repository also includes ready-to-use API collections and specifications:
+* **Postman collection:** `postman.json` in the `SysML-v2-API-Services` repository. Import this file into Postman to try the REST endpoints.
+* **OpenAPI 3.1 specifications:** `public/docs/openapi.json`, `public/docs/openapi-sans-schemas.json`, and `public/docs/openapi-x.json`.
+* **Legacy Swagger 2.0 specification:** `public/docs/openapi-legacy.yaml`.
+
+These files are available after cloning `SysML-v2-API-Services` in Part 1, step 1.
+
 **Keep this terminal open.** To stop the server, press `Enter` (or `Ctrl+C`).
 
 ---
@@ -164,7 +171,7 @@ Open a **new terminal** (Terminal B). Do **not** set `JAVA_HOME` to Java 11 here
 conda activate sysml
 git clone https://github.com/Systems-Modeling/SysML-v2-Release.git
 cd SysML-v2-Release
-git checkout 2026-04                # same release as API Services (Part 1)
+git checkout 2026-08                # latest SysML-v2-Release version
 cd install/jupyter
 chmod +x ./install.sh
 ./install.sh
@@ -175,7 +182,7 @@ The script (Windows: `install.bat`) installs the following into the active conda
 * Graphviz, which `%viz` needs
 * Node.js
 
-It also installs the JupyterLab SysML extension. Each release pins its own kernel version: the `2026-04` release installs kernel `0.59.0`. Check the version with `conda list jupyter-sysml-kernel`.
+It also installs the JupyterLab SysML extension. Each release pins its own kernel version. Check the installed version with `conda list jupyter-sysml-kernel`.
 
 Check that the kernel was registered:
 ```bash
