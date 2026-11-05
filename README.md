@@ -6,6 +6,39 @@ This guide shows how to set up a fully local SysML v2 environment:
 
 Nothing is sent to external servers.
 
+## Quick Start with Docker Compose (alternative to the manual setup)
+
+If you only have Docker installed, you can skip Parts 0–2 and run all three components in containers. No local Java 11/21, sbt or conda is needed.
+
+| Service | What | Port |
+|---|---|---|
+| `postgres` | PostgreSQL 13 (data kept in a named volume) | 5432 |
+| `api` | `SysML-v2-API-Services` (JDK 11, `sbt run`) | 9000 |
+| `jupyter` | JupyterLab + SysML kernel (Java 21, conda) | 8888 |
+
+```bash
+cp template.env .env              # optional: choose release tags
+docker compose up -d --build
+```
+
+* JupyterLab: http://localhost:8888 (no token, bound to localhost only). Open a **SysML** notebook.
+* API: http://localhost:9000/projects (Swagger docs at http://localhost:9000/docs/).
+* Notebooks are saved in `./notebooks`.
+
+The first build and the first API request take several minutes (dependency download and compilation). Jupyter starts after the API is healthy. Stop with `docker compose down`; add `-v` to also delete the database.
+
+The containers apply the configuration from the manual steps for you:
+* `persistence.xml`: the database host, user and password point at the `postgres` service, and `hibernate.hbm2ddl.auto=update` keeps published models between restarts.
+* `kernel.json`: `ISYSML_API_BASE_PATH` is set to `http://api:9000`, so `%publish` uses the local API.
+* Play's allowed-hosts filter is extended so requests to `api:9000` are accepted.
+* `sbt run` is kept alive with an open stdin (Play dev mode stops on EOF inside a container).
+
+Release tags are set in `.env` (see `template.env`): `API_TAG` (default `2026-04`) and `RELEASE_TAG` (default `2026-08`). If `%publish` fails, set both to the same release and rebuild with `docker compose up -d --build`.
+
+The rest of this guide describes the manual setup. The tutorial in Part 3 works with either.
+
+---
+
 ### Overview
 
 ```text

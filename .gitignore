@@ -1,0 +1,17 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+# Local env overrides
+.env.local
+*.log
+
+# Local env (copy from template.env)
+.env
