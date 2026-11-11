@@ -11,8 +11,12 @@ sed -i -E \
   "$F"
 grep -E "jdbc|hbm2ddl" "$F" || true
 
-# Allow requests addressed to the compose service name (Play AllowedHostsFilter)
-printf '\nplay.filters.hosts.allowed = ["localhost", "127.0.0.1", "api", "api:9000", "localhost:9000", "127.0.0.1:9000"]\n' >> /app/conf/application.conf
+# Play's AllowedHostsFilter: which Host headers the API accepts.
+# ALLOWED_HOSTS is comma separated; "." (or "*") means any host (default).
+# e.g. ALLOWED_HOSTS=localhost,api,10.100.52.117
+HOSTS_CONF=$(printf '%s' "${ALLOWED_HOSTS:-.}" | awk -v RS=, 'NF{gsub(/^[ \t]+|[ \t]+$/,""); if ($0=="*") $0="."; printf "%s\"%s\"", (n++?", ":""), $0}')
+printf '\nplay.filters.hosts.allowed = [%s]\n' "$HOSTS_CONF" >> /app/conf/application.conf
+tail -n 2 /app/conf/application.conf
 
 cd /app
 # Play dev mode stops on stdin EOF; keep stdin open forever

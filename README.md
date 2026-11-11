@@ -30,8 +30,21 @@ The first build and the first API request take several minutes (dependency downl
 The containers apply the configuration from the manual steps for you:
 * `persistence.xml`: the database host, user and password point at the `postgres` service, and `hibernate.hbm2ddl.auto=update` keeps published models between restarts.
 * `kernel.json`: `ISYSML_API_BASE_PATH` is set to `http://api:9000`, so `%publish` uses the local API.
-* Play's allowed-hosts filter is extended so requests to `api:9000` are accepted.
+* Play's allowed-hosts filter is extended so requests to `api:9000` are accepted. By default the API accepts any host name or IP, so it can be reached from other machines. To restrict it, set `ALLOWED_HOSTS` in `.env` (comma separated, e.g. `ALLOWED_HOSTS=localhost,api,10.0.0.5`).
 * `sbt run` is kept alive with an open stdin (Play dev mode stops on EOF inside a container).
+
+Host ports are set in `.env` too (`POSTGRES_PORT`, `API_PORT`, `JUPYTER_PORT`; defaults 5432, 9000, 8888). Change them if a port is already in use, and use the new port in the URLs above.
+
+The API and JupyterLab are published on all interfaces (`BIND_ADDRESS=0.0.0.0`), so they are reachable from other machines; PostgreSQL stays on localhost. Set `BIND_ADDRESS=127.0.0.1` to keep them local. **JupyterLab runs without a login by default: set `JUPYTER_TOKEN` in `.env` when the server is reachable from a network**, because anyone who can open it can run code on the host.
+
+Prebuilt images are published to the GitHub Container Registry by a GitHub Actions workflow (`.github/workflows/docker.yml`), so you can skip the slow local build:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+`IMAGE_PREFIX` in `.env` selects the registry/owner (default `ghcr.io/nhaskaris`). `docker compose up -d --build` still builds the images locally. The image tags follow `API_TAG` and `RELEASE_TAG`.
 
 Release tags are set in `.env` (see `template.env`): `API_TAG` (default `2026-04`) and `RELEASE_TAG` (default `2026-08`). If `%publish` fails, set both to the same release and rebuild with `docker compose up -d --build`.
 
